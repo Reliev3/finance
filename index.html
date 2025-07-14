@@ -3,253 +3,254 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Expense Tracker</title>
+    <title>Finance Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dayjs@1.10.7/dayjs.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/dayjs@1.10.7/plugin/isoWeek.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/dayjs@1.10.7/plugin/isToday.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
-
         :root {
-            --background-color: #f4f4f4;
-            --text-color: #111;
-            --card-background: #fff;
-            --border-color: #eaeaea;
-            --accent-color: #0070f3;
-            --income-color: #1a73e8;
-            --expense-color: #d93025;
-            --balance-color: #111;
+            --background-color: #121212;
+            --text-color: #ffffff;
+            --card-background: #1e1e1e;
+            --border-color: #2c2c2c;
+            --income-color: #28a745;
+            --expense-color: #dc3545;
+            --balance-color: #ffffff;
         }
-
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             background-color: var(--background-color);
             color: var(--text-color);
             margin: 0;
-            padding: 2rem;
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            min-height: 100vh;
+            padding: 1rem;
         }
-
         .container {
             width: 100%;
-            max-width: 1200px;
+            max-width: 600px; /* Mobile-first max-width */
+            margin: 0 auto;
             display: grid;
-            gap: 2rem;
+            gap: 1rem;
         }
-
         header {
             display: flex;
-            justify-content: space-between;
+            flex-direction: column;
             align-items: center;
+            gap: 1rem;
+            text-align: center;
         }
-
         h1 {
-            font-size: 2rem;
+            font-size: 1.8rem;
             font-weight: 700;
             margin: 0;
         }
-
-        .filter-container select {
-            font-family: 'Inter', sans-serif;
-            padding: 0.5rem 1rem;
-            font-size: 1rem;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            background-color: var(--card-background);
-            cursor: pointer;
-        }
-
         .scorecard-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 2rem;
+            grid-template-columns: 1fr;
+            gap: 1rem;
         }
-
         .card {
             background-color: var(--card-background);
             padding: 1.5rem;
             border-radius: 8px;
             border: 1px solid var(--border-color);
         }
-
         .card h2 {
             margin: 0 0 0.5rem 0;
             font-size: 1rem;
             font-weight: 500;
-            color: #666;
+            color: #aaa;
         }
-
         .card .value {
-            font-size: 2.5rem;
+            font-size: 2.2rem;
             font-weight: 700;
         }
-
         .card .value.income { color: var(--income-color); }
         .card .value.expense { color: var(--expense-color); }
         .card .value.balance { color: var(--balance-color); }
-
         .chart-container {
             background-color: var(--card-background);
-            padding: 2rem;
+            padding: 1.5rem;
             border-radius: 8px;
             border: 1px solid var(--border-color);
+        }
+        /* Tablet and Desktop */
+        @media (min-width: 768px) {
+            .container {
+                max-width: 1200px;
+            }
+            .scorecard-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            header {
+                flex-direction: row;
+                justify-content: space-between;
+            }
         }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <header>
-        <h1>Dashboard</h1>
-        <div class="filter-container">
-            <select id="timeFilter">
-                <option value="today">Today</option>
-                <option value="week">This Week</option>
-                <option value="month" selected>This Month</option>
-            </select>
-        </div>
-    </header>
+    <div class="container">
+        <header>
+            <h1>Finance Dashboard</h1>
+        </header>
 
-    <div class="scorecard-grid">
-        <div class="card">
-            <h2>Balance</h2>
-            <div id="balanceScorecard" class="value balance">$0.00</div>
+        <div class="scorecard-grid">
+            <div class="card">
+                <h2>Balance</h2>
+                <div id="balanceScorecard" class="value balance">$0.00</div>
+            </div>
+            <div class="card">
+                <h2>Income</h2>
+                <div id="incomeScorecard" class="value income">$0.00</div>
+            </div>
+            <div class="card">
+                <h2>Expenses</h2>
+                <div id="expenseScorecard" class="value expense">$0.00</div>
+            </div>
         </div>
-        <div class="card">
-            <h2>Income</h2>
-            <div id="incomeScorecard" class="value income">$0.00</div>
-        </div>
-        <div class="card">
-            <h2>Expenses</h2>
-            <div id="expenseScorecard" class="value expense">$0.00</div>
+
+        <div class="chart-container">
+            <canvas id="financeChart"></canvas>
         </div>
     </div>
 
-    <div class="chart-container">
-        <canvas id="transactionsChart"></canvas>
-    </div>
-</div>
+    <script>
+        // --- Sample Data ---
+        const sampleData = [
+            { date: '2025-07-01', amount: 2000.00 }, { date: '2025-07-02', amount: -50.25 },
+            { date: '2025-07-03', amount: -125.00 }, { date: '2025-07-05', amount: -22.80 },
+            { date: '2025-07-08', amount: -75.00 }, { date: '2025-07-10', amount: 500.00 },
+            { date: '2025-07-15', amount: -300.00 }, { date: '2025-07-18', amount: -45.50 },
+            { date: '2025-07-22', amount: 150.00 }, { date: '2025-07-25', amount: -120.00 },
+            { date: '2025-07-30', amount: -60.00 }, { date: '2025-07-31', amount: 2500.00 },
+        ];
 
-<script>
-    dayjs.extend(window.dayjs_plugin_isoWeek);
-    dayjs.extend(window.dayjs_plugin_isToday);
+        // --- DOM Elements ---
+        const balanceEl = document.getElementById('balanceScorecard');
+        const incomeEl = document.getElementById('incomeScorecard');
+        const expenseEl = document.getElementById('expenseScorecard');
+        const ctx = document.getElementById('financeChart').getContext('2d');
+        let financeChart;
 
-    // --- Sample Data ---
-    // Using positive values for income and negative for expenses.
-    const sampleData = [
-        { date: '2025-07-01', amount: -25.50 }, { date: '2025-07-02', amount: 1500.00 },
-        { date: '2025-07-03', amount: -120.00 }, { date: '2025-07-05', amount: -45.20 },
-        { date: '2025-07-07', amount: -88.75 }, { date: '2025-07-10', amount: -15.00 },
-        { date: '2025-07-14', amount: -75.00 }, { date: '2025-07-14', amount: 200.00 },
-        { date: '2025-07-15', amount: 1500.00 }, { date: '2025-07-18', amount: -250.00 },
-        { date: '2025-07-20', amount: -30.00 }, { date: '2025-07-22', amount: -12.30 },
-        { date: '2025-07-25', amount: -180.40 }, { date: '2025-07-28', amount: -65.00 },
-        { date: '2025-07-30', amount: -22.00 }, { date: '2025-06-25', amount: -50.00 },
-    ];
+        // --- Utility Functions ---
+        const formatCurrency = (value) => value.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 
-    // --- Chart and Scorecard Elements ---
-    const balanceEl = document.getElementById('balanceScorecard');
-    const incomeEl = document.getElementById('incomeScorecard');
-    const expenseEl = document.getElementById('expenseScorecard');
-    const filterEl = document.getElementById('timeFilter');
-    const ctx = document.getElementById('transactionsChart').getContext('2d');
-    let transactionsChart;
+        // --- Main Update Function ---
+        function updateDashboard() {
+            const sortedData = sampleData.sort((a, b) => dayjs(a.date) - dayjs(b.date));
 
-    // --- Utility Functions ---
-    const formatCurrency = (value) => value.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+            const labels = [...new Set(sortedData.map(d => dayjs(d.date).format('MMM D')))];
+            
+            let cumulativeBalance = 0;
+            let cumulativeIncome = 0;
+            let cumulativeExpenses = 0;
 
-    // --- Main Update Function ---
-    function updateDashboard(filter = 'month') {
-        const now = dayjs();
-        let filteredData;
+            const incomeData = [];
+            const expenseData = [];
+            const balanceData = [];
 
-        if (filter === 'today') {
-            filteredData = sampleData.filter(d => dayjs(d.date).isToday());
-        } else if (filter === 'week') {
-            filteredData = sampleData.filter(d => dayjs(d.date).isoWeek() === now.isoWeek() && dayjs(d.date).year() === now.year());
-        } else { // month
-            filteredData = sampleData.filter(d => dayjs(d.date).month() === now.month() && dayjs(d.date).year() === now.year());
-        }
-        
-        // --- Calculate Scorecards ---
-        const income = filteredData.filter(d => d.amount > 0).reduce((sum, d) => sum + d.amount, 0);
-        const expenses = filteredData.filter(d => d.amount < 0).reduce((sum, d) => sum + d.amount, 0);
-        const balance = income + expenses;
+            const dailyTotals = {};
 
-        balanceEl.textContent = formatCurrency(balance);
-        incomeEl.textContent = formatCurrency(income);
-        expenseEl.textContent = formatCurrency(Math.abs(expenses));
+            sortedData.forEach(d => {
+                const day = dayjs(d.date).format('MMM D');
+                if (!dailyTotals[day]) {
+                    dailyTotals[day] = { income: 0, expenses: 0 };
+                }
+                if (d.amount > 0) {
+                    dailyTotals[day].income += d.amount;
+                } else {
+                    dailyTotals[day].expenses += Math.abs(d.amount);
+                }
+            });
+            
+            labels.forEach(label => {
+                const dayData = dailyTotals[label] || { income: 0, expenses: 0 };
+                cumulativeIncome += dayData.income;
+                cumulativeExpenses += dayData.expenses;
+                cumulativeBalance = cumulativeIncome - cumulativeExpenses;
 
-        // --- Prepare Chart Data ---
-        const sortedData = filteredData.sort((a, b) => dayjs(a.date) - dayjs(b.date));
-        const labels = [...new Set(sortedData.map(d => dayjs(d.date).format('MMM D')))];
-        
-        const dailyTotals = {};
-        sortedData.forEach(d => {
-            const day = dayjs(d.date).format('MMM D');
-            if (!dailyTotals[day]) dailyTotals[day] = 0;
-            dailyTotals[day] += d.amount;
-        });
+                incomeData.push(cumulativeIncome);
+                expenseData.push(cumulativeExpenses);
+                balanceData.push(cumulativeBalance);
+            });
 
-        const chartData = labels.map(label => dailyTotals[label]);
+            // --- Update Scorecards ---
+            balanceEl.textContent = formatCurrency(cumulativeBalance);
+            incomeEl.textContent = formatCurrency(cumulativeIncome);
+            expenseEl.textContent = formatCurrency(cumulativeExpenses);
 
-        // --- Render Chart ---
-        if (transactionsChart) {
-            transactionsChart.destroy();
-        }
-        
-        transactionsChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Net Daily Flow',
-                    data: chartData,
-                    borderColor: '#888',
-                    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-                    fill: true,
-                    tension: 0.1,
-                    pointBackgroundColor: chartData.map(v => v >= 0 ? 'var(--income-color)' : 'var(--expense-color)'),
-                    pointRadius: 5,
-                    pointHoverRadius: 7,
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: (context) => `Amount: ${formatCurrency(context.parsed.y)}`
+            // --- Render Chart ---
+            if (financeChart) {
+                financeChart.destroy();
+            }
+
+            financeChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Income',
+                            data: incomeData,
+                            borderColor: 'rgba(40, 167, 69, 1)',
+                            backgroundColor: 'rgba(40, 167, 69, 0.2)',
+                            fill: true,
+                            tension: 0.4, // Smooth lines
+                        },
+                        {
+                            label: 'Expenses',
+                            data: expenseData,
+                            borderColor: 'rgba(220, 53, 69, 1)',
+                            backgroundColor: 'rgba(220, 53, 69, 0.2)',
+                            fill: true,
+                            tension: 0.4, // Smooth lines
+                        },
+                        {
+                            label: 'Balance',
+                            data: balanceData,
+                            borderColor: 'rgba(255, 255, 255, 1)',
+                            backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                            fill: true,
+                            tension: 0.4, // Smooth lines
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#ffffff'
+                            }
                         }
                     },
-                },
-                scales: {
-                    y: {
-                        ticks: {
-                            callback: (value) => formatCurrency(value)
+                    scales: {
+                        y: {
+                            ticks: {
+                                color: '#ffffff',
+                                callback: (value) => formatCurrency(value)
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: '#ffffff'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
                         }
                     }
                 }
-            }
-        });
-    }
+            });
+        }
 
-    // --- Event Listener ---
-    filterEl.addEventListener('change', (e) => {
-        updateDashboard(e.target.value);
-    });
-
-    // --- Initial Load ---
-    updateDashboard();
-</script>
+        // --- Initial Load ---
+        updateDashboard();
+    </script>
 
 </body>
 </html>
