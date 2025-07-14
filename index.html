@@ -6,6 +6,7 @@
     <title>Finance Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dayjs@1.10.7/dayjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1.10.7/plugin/isoWeek.js"></script>
     <style>
         :root {
             --background-color: #121212;
@@ -15,6 +16,7 @@
             --income-color: #28a745;
             --expense-color: #dc3545;
             --balance-color: #ffffff;
+            --dropdown-bg: #2c2c2c;
         }
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -25,7 +27,7 @@
         }
         .container {
             width: 100%;
-            max-width: 600px; /* Mobile-first max-width */
+            max-width: 600px;
             margin: 0 auto;
             display: grid;
             gap: 1rem;
@@ -41,6 +43,14 @@
             font-size: 1.8rem;
             font-weight: 700;
             margin: 0;
+        }
+        #filter {
+            background-color: var(--dropdown-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 1rem;
         }
         .scorecard-grid {
             display: grid;
@@ -71,6 +81,7 @@
             padding: 1.5rem;
             border-radius: 8px;
             border: 1px solid var(--border-color);
+            min-height: 300px; /* Ensure chart has height */
         }
         /* Tablet and Desktop */
         @media (min-width: 768px) {
@@ -92,6 +103,12 @@
     <div class="container">
         <header>
             <h1>Finance Dashboard</h1>
+            <select id="filter">
+                <option value="month">This Month</option>
+                <option value="week">This Week</option>
+                <option value="today">Today</option>
+                <option value="all">All Time</option>
+            </select>
         </header>
 
         <div class="scorecard-grid">
@@ -115,11 +132,22 @@
     </div>
 
     <script>
+        // Extend dayjs with isoWeek plugin
+        dayjs.extend(window.dayjs_plugin_isoWeek);
+
         // --- Sample Data ---
+        // Added more data for better filtering examples
         const sampleData = [
+             // Previous month data
+            { date: '2025-06-25', amount: 1500.00 },
+            { date: '2025-06-28', amount: -40.00 },
+            // This month's data
             { date: '2025-07-01', amount: 2000.00 }, { date: '2025-07-02', amount: -50.25 },
             { date: '2025-07-03', amount: -125.00 }, { date: '2025-07-05', amount: -22.80 },
             { date: '2025-07-08', amount: -75.00 }, { date: '2025-07-10', amount: 500.00 },
+             // Today's Data (July 14, 2025)
+            { date: '2025-07-14', amount: -15.50 }, { date: '2025-07-14', amount: 25.00 },
+            // Future data for this month
             { date: '2025-07-15', amount: -300.00 }, { date: '2025-07-18', amount: -45.50 },
             { date: '2025-07-22', amount: 150.00 }, { date: '2025-07-25', amount: -120.00 },
             { date: '2025-07-30', amount: -60.00 }, { date: '2025-07-31', amount: 2500.00 },
@@ -129,21 +157,44 @@
         const balanceEl = document.getElementById('balanceScorecard');
         const incomeEl = document.getElementById('incomeScorecard');
         const expenseEl = document.getElementById('expenseScorecard');
+        const filterEl = document.getElementById('filter');
         const ctx = document.getElementById('financeChart').getContext('2d');
         let financeChart;
 
         // --- Utility Functions ---
         const formatCurrency = (value) => value.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 
+        // --- Event Listener ---
+        filterEl.addEventListener('change', (e) => {
+            updateDashboard(e.target.value);
+        });
+
         // --- Main Update Function ---
-        function updateDashboard() {
-            const sortedData = sampleData.sort((a, b) => dayjs(a.date) - dayjs(b.date));
+        function updateDashboard(period = 'month') {
+            const now = dayjs('2025-07-14'); // Forcing today's date for consistent demonstration
+
+            const filteredData = sampleData.filter(d => {
+                const date = dayjs(d.date);
+                switch (period) {
+                    case 'today':
+                        return date.isSame(now, 'day');
+                    case 'week':
+                        return date.isSame(now, 'isoWeek');
+                    case 'month':
+                        return date.isSame(now, 'month');
+                    case 'all':
+                    default:
+                        return true;
+                }
+            });
+
+            const sortedData = filteredData.sort((a, b) => dayjs(a.date) - dayjs(b.date));
 
             const labels = [...new Set(sortedData.map(d => dayjs(d.date).format('MMM D')))];
             
             let cumulativeBalance = 0;
-            let cumulativeIncome = 0;
-            let cumulativeExpenses = 0;
+            let totalPeriodIncome = 0;
+            let totalPeriodExpenses = 0;
 
             const incomeData = [];
             const expenseData = [];
@@ -151,6 +202,7 @@
 
             const dailyTotals = {};
 
+            // Calculate totals for each day in the filtered period
             sortedData.forEach(d => {
                 const day = dayjs(d.date).format('MMM D');
                 if (!dailyTotals[day]) {
@@ -162,22 +214,35 @@
                     dailyTotals[day].expenses += Math.abs(d.amount);
                 }
             });
-            
+
+            // If labels array is empty (no data for period), add today's label for a clean chart
+            if (labels.length === 0 && period ==='today') {
+                labels.push(now.format('MMM D'));
+            } else if (labels.length === 0) {
+                 labels.push('No Data');
+            }
+
+
+            // Generate cumulative data for the chart
+            let runningBalance = 0;
             labels.forEach(label => {
                 const dayData = dailyTotals[label] || { income: 0, expenses: 0 };
-                cumulativeIncome += dayData.income;
-                cumulativeExpenses += dayData.expenses;
-                cumulativeBalance = cumulativeIncome - cumulativeExpenses;
+                runningBalance += dayData.income - dayData.expenses;
 
-                incomeData.push(cumulativeIncome);
-                expenseData.push(cumulativeExpenses);
-                balanceData.push(cumulativeBalance);
+                incomeData.push(dayData.income); // Show daily income on chart
+                expenseData.push(dayData.expenses); // Show daily expense on chart
+                balanceData.push(runningBalance); // Show running balance on chart
             });
+            
+            // Calculate totals for scorecards
+            totalPeriodIncome = Object.values(dailyTotals).reduce((sum, day) => sum + day.income, 0);
+            totalPeriodExpenses = Object.values(dailyTotals).reduce((sum, day) => sum + day.expenses, 0);
+            cumulativeBalance = totalPeriodIncome - totalPeriodExpenses;
 
             // --- Update Scorecards ---
             balanceEl.textContent = formatCurrency(cumulativeBalance);
-            incomeEl.textContent = formatCurrency(cumulativeIncome);
-            expenseEl.textContent = formatCurrency(cumulativeExpenses);
+            incomeEl.textContent = formatCurrency(totalPeriodIncome);
+            expenseEl.textContent = formatCurrency(totalPeriodExpenses);
 
             // --- Render Chart ---
             if (financeChart) {
@@ -210,8 +275,9 @@
                             data: balanceData,
                             borderColor: 'rgba(255, 255, 255, 1)',
                             backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                            fill: true,
+                            fill: false, // Balance line looks cleaner without a fill
                             tension: 0.4, // Smooth lines
+                            type: 'line' // Ensure balance is a line
                         }
                     ]
                 },
@@ -222,6 +288,20 @@
                         legend: {
                             labels: {
                                 color: '#ffffff'
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        label += formatCurrency(context.parsed.y);
+                                    }
+                                    return label;
+                                }
                             }
                         }
                     },
@@ -249,8 +329,9 @@
         }
 
         // --- Initial Load ---
-        updateDashboard();
+        updateDashboard(filterEl.value);
     </script>
 
 </body>
 </html>
+
